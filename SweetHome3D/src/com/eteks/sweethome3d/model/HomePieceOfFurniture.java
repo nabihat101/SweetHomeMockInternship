@@ -71,7 +71,7 @@ public class HomePieceOfFurniture extends HomeObject implements PieceOfFurniture
       public int compare(HomePieceOfFurniture o1, HomePieceOfFurniture o2) {
         return HomePieceOfFurniture.compare(o1.getVolume(), o2.getVolume());
       }
-    })
+    });
 
     SORTABLE_PROPERTY_COMPARATORS.put(SortableProperty.CATALOG_ID, new Comparator<HomePieceOfFurniture>() {
         public int compare(HomePieceOfFurniture piece1, HomePieceOfFurniture piece2) {
