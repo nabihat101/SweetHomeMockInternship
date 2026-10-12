@@ -37,12 +37,8 @@ import java.awt.print.PrinterException;
 import java.awt.print.PrinterJob;
 import java.security.AccessControlException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 import java.util.Set;
@@ -135,8 +131,6 @@ public class HomePrintableComponent extends JComponent implements Printable {
   private JLabel               fixedFooterLabel;
   private JLabel               fixedFirstPageHeaderLabel;
   private JLabel               fixedFirstPageFooterLabel;
-  private Map<Level, Integer>  levelPlanPageCounts = new HashMap<Level, Integer>();
-  private Level                printedPlanLevel;
 
   /**
    * Creates a printable component that will print or display the
@@ -192,7 +186,6 @@ public class HomePrintableComponent extends JComponent implements Printable {
     if (Thread.interrupted()) {
       throw new InterruptedPrinterException();
     }
-    this.printedPlanLevel = null;
 
     Graphics2D g2D = (Graphics2D)g;
     g2D.setFont(this.defaultFont);
@@ -221,8 +214,6 @@ public class HomePrintableComponent extends JComponent implements Printable {
     float imageableY = (float)pageFormat.getImageableY();
     float imageableHeight = (float)pageFormat.getImageableHeight();
     String header = null;
-    FontMetrics fontMetrics = null;
-    Object [] variableValues = null;
     float  xHeader = 0;
     float  yHeader = 0;
     float  xFixedHeader = 0;
@@ -259,7 +250,7 @@ public class HomePrintableComponent extends JComponent implements Printable {
             || fixedHeaderPageLabel != null
             || fixedFooterPageLabel != null) {
       if (homePrint != null) {
-        fontMetrics = g2D.getFontMetrics(this.headerFooterFont);
+        FontMetrics fontMetrics = g2D.getFontMetrics(this.headerFooterFont);
         float headerFooterHeight = fontMetrics.getAscent() + fontMetrics.getDescent() + HEADER_FOOTER_MARGIN;
 
         // Retrieve variable values
@@ -293,7 +284,7 @@ public class HomePrintableComponent extends JComponent implements Printable {
         }
         String homePresentationName = this.controller.getContentManager().getPresentationName(
                 homeName, ContentManager.ContentType.SWEET_HOME_3D);
-        variableValues = new Object [] {
+        Object [] variableValues = new Object [] {
                 pageNumber, pageCount, planScale, this.printDate, homePresentationName, homeName, levelName};
 
         // Create header text
@@ -354,8 +345,7 @@ public class HomePrintableComponent extends JComponent implements Printable {
     View furnitureView = this.controller.getFurnitureController().getView();
     if (furnitureView != null
             && (homePrint == null || homePrint.isFurniturePrinted())) {
-      // Furniture of all viewable levels is printed (FurnitureTable ignores furniture of
-      // non viewable levels and adds a Level column to the printed table)
+      // Furniture of all viewable levels is printed (FurnitureTable adds a Level column)
       pageExists = ((Printable)furnitureView).print(g2D, pageFormat, page);
       if (pageExists == PAGE_EXISTS
               && !this.printablePages.contains(page)) {
@@ -363,134 +353,53 @@ public class HomePrintableComponent extends JComponent implements Printable {
         this.furniturePageCount++;
       }
     }
-    try {
-      if (pageExists == NO_SUCH_PAGE
-              && planView != null
-              && (homePrint == null || homePrint.isPlanPrinted())) {
-        // Print the plan pages of each viewable level, in level order
-        pageExists = printPlanPage(g2D, pageFormat, page - this.furniturePageCount, planView);
-        if (pageExists == PAGE_EXISTS
-                && !this.printablePages.contains(page)) {
-          this.printablePages.add(page);
-          this.planPageCount++;
-        }
+    if (pageExists == NO_SUCH_PAGE
+            && planView != null
+            && (homePrint == null || homePrint.isPlanPrinted())) {
+      // Try to print next plan view page (PlanComponent prints the plan of each viewable level)
+      pageExists = ((Printable)planView).print(g2D, pageFormat, page - this.furniturePageCount);
+      if (pageExists == PAGE_EXISTS
+              && !this.printablePages.contains(page)) {
+        this.printablePages.add(page);
+        this.planPageCount++;
       }
-      View view3D = this.controller.getHomeController3D().getView();
-      if (pageExists == NO_SUCH_PAGE
-              && view3D != null
-              && (homePrint == null || homePrint.isView3DPrinted())) {
-        pageExists = ((Printable)view3D).print(g2D, pageFormat, page - this.planPageCount - this.furniturePageCount);
-        if (pageExists == PAGE_EXISTS
-                && !this.printablePages.contains(page)) {
-          this.printablePages.add(page);
-        }
-      }
-
-      // Print header and footer
-      if (pageExists == PAGE_EXISTS) {
-        if (this.printedPlanLevel != null && variableValues != null) {
-          // Use the name of the level that was actually printed
-          String levelName = this.printedPlanLevel.getName();
-          variableValues [6] = levelName != null ? levelName : "";
-          if (header != null) {
-            header = Variable.getMessageFormat(homePrint.getHeaderFormat()).format(variableValues).trim();
-            xHeader = ((float)pageFormat.getWidth() - fontMetrics.stringWidth(header)) / 2;
-          }
-          if (footer != null) {
-            footer = Variable.getMessageFormat(homePrint.getFooterFormat()).format(variableValues).trim();
-            xFooter = ((float)pageFormat.getWidth() - fontMetrics.stringWidth(footer)) / 2;
-          }
-        }
-        g2D.setTransform(oldTransform);
-        g2D.setClip(clipBounds);
-        g2D.setFont(this.headerFooterFont);
-        g2D.setColor(Color.BLACK);
-        if (fixedHeaderPageLabel != null) {
-          g2D.translate(xFixedHeader, yFixedHeader);
-          fixedHeaderPageLabel.print(g2D);
-          g2D.translate(-xFixedHeader, -yFixedHeader);
-        }
-        if (header != null) {
-          g2D.drawString(header, xHeader, yHeader);
-        }
-        if (footer != null) {
-          g2D.drawString(footer, xFooter, yFooter);
-        }
-        if (fixedFooterPageLabel != null) {
-          g2D.translate(xFixedFooter, yFixedFooter);
-          fixedFooterPageLabel.print(g2D);
-          g2D.translate(-xFixedFooter, -yFixedFooter);
-        }
-      }
-    } finally {
-      pageFormat.setPaper(oldPaper);
     }
+    View view3D = this.controller.getHomeController3D().getView();
+    if (pageExists == NO_SUCH_PAGE
+            && view3D != null
+            && (homePrint == null || homePrint.isView3DPrinted())) {
+      pageExists = ((Printable)view3D).print(g2D, pageFormat, page - this.planPageCount - this.furniturePageCount);
+      if (pageExists == PAGE_EXISTS
+              && !this.printablePages.contains(page)) {
+        this.printablePages.add(page);
+      }
+    }
+
+    // Print header and footer
+    if (pageExists == PAGE_EXISTS) {
+      g2D.setTransform(oldTransform);
+      g2D.setClip(clipBounds);
+      g2D.setFont(this.headerFooterFont);
+      g2D.setColor(Color.BLACK);
+      if (fixedHeaderPageLabel != null) {
+        g2D.translate(xFixedHeader, yFixedHeader);
+        fixedHeaderPageLabel.print(g2D);
+        g2D.translate(-xFixedHeader, -yFixedHeader);
+      }
+      if (header != null) {
+        g2D.drawString(header, xHeader, yHeader);
+      }
+      if (footer != null) {
+        g2D.drawString(footer, xFooter, yFooter);
+      }
+      if (fixedFooterPageLabel != null) {
+        g2D.translate(xFixedFooter, yFixedFooter);
+        fixedFooterPageLabel.print(g2D);
+        g2D.translate(-xFixedFooter, -yFixedFooter);
+      }
+    }
+    pageFormat.setPaper(oldPaper);
     return pageExists;
-  }
-
-  /**
-   * Returns the viewable levels, in the order of the home levels.
-   */
-  private List<Level> getPrintedLevels() {
-    List<Level> levels = new ArrayList<Level>();
-    for (Level level : this.home.getLevels()) {
-      if (level.isViewable()) {
-        levels.add(level);
-      }
-    }
-    return levels;
-  }
-
-  /**
-   * Prints the plan page <code>planPageIndex</code> counted over all the viewable levels.
-   * The selected level of home is always restored, even if printing fails.
-   */
-  private int printPlanPage(Graphics2D g2D, PageFormat pageFormat, int planPageIndex,
-                            PlanView planView) throws PrinterException {
-    Level selectedLevel = this.home.getSelectedLevel();
-    try {
-      List<Level> levels = getPrintedLevels();
-      if (levels.isEmpty()) {
-        return ((Printable)planView).print(g2D, pageFormat, planPageIndex);
-      }
-      int remainingPages = planPageIndex;
-      for (Level level : levels) {
-        this.home.setSelectedLevel(level);
-        if (((Printable)planView).print(g2D, pageFormat, remainingPages) == PAGE_EXISTS) {
-          this.printedPlanLevel = level;
-          return PAGE_EXISTS;
-        }
-        // Page isn't in this level: count its pages and look in the next level
-        Integer levelPageCount = this.levelPlanPageCounts.get(level);
-        if (levelPageCount == null) {
-          levelPageCount = countPlanPages(planView, pageFormat);
-          this.levelPlanPageCounts.put(level, levelPageCount);
-        }
-        remainingPages -= levelPageCount;
-      }
-      return NO_SUCH_PAGE;
-    } finally {
-      if (this.home.getSelectedLevel() != selectedLevel) {
-        this.home.setSelectedLevel(selectedLevel);
-      }
-    }
-  }
-
-  /**
-   * Returns the count of plan pages of the currently selected level.
-   */
-  private int countPlanPages(PlanView planView, PageFormat pageFormat) throws PrinterException {
-    BufferedImage dummyImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
-    Graphics2D dummyGraphics = (Graphics2D)dummyImage.getGraphics();
-    try {
-      int count = 0;
-      while (((Printable)planView).print(dummyGraphics, pageFormat, count) == PAGE_EXISTS) {
-        count++;
-      }
-      return count;
-    } finally {
-      dummyGraphics.dispose();
-    }
   }
 
   /**
@@ -544,7 +453,7 @@ public class HomePrintableComponent extends JComponent implements Printable {
   }
 
   /**
-   * Returns the page count of the home printed by this component. 
+   * Returns the page count of the home printed by this component.
    */
   public int getPageCount() {
     if (this.pageCount == -1) {
