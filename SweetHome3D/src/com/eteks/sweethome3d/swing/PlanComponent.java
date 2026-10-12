@@ -2003,6 +2003,7 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
     return strokeWidth;
   }
 
+
   /**
    * Prints this component plan, one set of pages for each viewable level, in level order.
    * The selected level of home is restored after printing, even if printing fails.
@@ -2014,17 +2015,21 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
         printedLevels.add(level);
       }
     }
+
     if (printedLevels.isEmpty()) {
       return printSelectedLevel(g, pageFormat, pageIndex);
     }
+
     int levelPageCount = getLevelPrintPageCount(g, pageFormat);
     if (levelPageCount == 0
             || pageIndex < 0
             || pageIndex >= levelPageCount * printedLevels.size()) {
       return NO_SUCH_PAGE;
     }
+
     Level selectedLevel = this.home.getSelectedLevel();
     Level printedLevel = printedLevels.get(pageIndex / levelPageCount);
+
     try {
       if (selectedLevel != printedLevel) {
         this.home.setSelectedLevel(printedLevel);
@@ -2039,27 +2044,36 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
 
   /**
    * Returns the count of pages needed to print the plan of one level.
-   * It's the same for each level because the plan bounds include all viewable levels.
    */
   private int getLevelPrintPageCount(Graphics g, PageFormat pageFormat) {
     Rectangle2D printedItemBounds = getItemsBounds(g, getPaintedItems());
     if (printedItemBounds == null) {
       return 0;
     }
+
     if (this.home.getPrint() == null || this.home.getPrint().getPlanScale() == null) {
       return 1;
     }
-    float printScale = this.home.getPrint().getPlanScale().floatValue() * LengthUnit.centimeterToInch(72);
-    int pagesPerRow = (int)(printedItemBounds.getWidth() * printScale / pageFormat.getImageableWidth());
+
+    float printScale = this.home.getPrint().getPlanScale().floatValue()
+            * LengthUnit.centimeterToInch(72);
+
+    int pagesPerRow = (int)(printedItemBounds.getWidth() * printScale
+            / pageFormat.getImageableWidth());
     if (printedItemBounds.getWidth() * printScale != pageFormat.getImageableWidth()) {
       pagesPerRow++;
     }
-    int pagesPerColumn = (int)(printedItemBounds.getHeight() * printScale / pageFormat.getImageableHeight());
+
+    int pagesPerColumn = (int)(printedItemBounds.getHeight() * printScale
+            / pageFormat.getImageableHeight());
     if (printedItemBounds.getHeight() * printScale != pageFormat.getImageableHeight()) {
       pagesPerColumn++;
     }
+
     return pagesPerRow * pagesPerColumn;
   }
+
+
   /**
    * Prints this component plan at the scale given in the home print attributes or at a scale
    * that makes it fill <code>pageFormat</code> imageable size if this attribute is <code>null</code>.
